@@ -1,185 +1,233 @@
-# TDS Project 1 — Q2: Transcribe Spoken Digits
+# Project 1 — Q2: Transcribe Spoken Digits (300 Digits from Audio)
 
 ## Problem Summary
 
-This task provided an audio clip containing a spoken **300-digit number**.  
-The objective was to transcribe the full number exactly and submit it along with the provided SHA-256 hash.
+The task is to listen to an automatically generated audio clip containing **300 spoken digits** and submit the full number.
 
-Important constraint:
-
-- A new audio sample is generated every time the page is reloaded.
-- Therefore, the currently visible audio and hash had to be handled together without refreshing the page.
-
----
-
-## Initial Observation
-
-At first, the browser Network tab did not show any `.wav`, `.mp3`, or `.ogg` file request.
-
-On inspecting the HTML of the audio player, the following pattern was found:
-
-```html
-<audio controls preload="none" src="data:audio/mpeg;base64,...">
-```
-
-This revealed that the full audio file was embedded directly in the page as a **Base64-encoded MP3**.
-
-So the correct workflow became:
-
-1. Extract the Base64 audio data from the HTML
-2. Decode it into an MP3 file
-3. Transcribe the spoken digits automatically
-4. Join the digits into one continuous 300-digit number
-5. Verify the number using the given SHA-256 hash
-
----
-
-## Extraction Process
-
-### Step 1 — Inspect the audio element
-
-The audio player HTML showed:
-
-```html
-<audio controls preload="none" src="data:audio/mpeg;base64,...">
-```
-
-This confirmed that the audio was embedded directly in the page source.
-
-### Step 2 — Copy the Base64 string
-
-Only the part after:
-
-```text
-data:audio/mpeg;base64,
-```
-
-was copied and saved into a text file.
-
-### Step 3 — Clean and decode the Base64
-
-The Base64 string was cleaned and decoded into an MP3 file.
-
-Example command used:
-
-```bash
-base64 -D -i audio_base64_clean.txt -o digits.mp3
-```
-
-### Step 4 — Verify audio file
-
-```bash
-file digits.mp3
-```
-
-Output confirmed that the file was a valid MP3 audio file.
-
----
-
-## Transcription Process
-
-### Step 5 — Create a Python virtual environment
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-### Step 6 — Install Whisper
-
-```bash
-pip install --upgrade pip
-pip install openai-whisper
-```
-
-### Step 7 — Run speech recognition
-
-Initial transcription with the `small` model produced a 302-digit sequence, indicating minor insertion errors.
-
-A better transcription was obtained using the `medium` model:
-
-```bash
-python -m whisper digits.mp3 --model medium --language en
-```
-
-### Step 8 — Extract only digits
-
-The transcript was processed to keep only numeric characters.
-
-Verification script used:
-
-```bash
-python - <<'PY'
-import re, hashlib
-text = open("digits.txt").read()
-digits = "".join(re.findall(r"\d", text))
-print(digits)
-print("length =", len(digits))
-print("sha256 =", hashlib.sha256(digits.encode()).hexdigest())
-PY
-```
-
----
-
-## Final Transcribed Number
-
-```text
-782176428563539843647502321530753319075407656483147620417267650019183269823095728606650681185717066806781693071483530842126956007856013829124336178703612828669042348697814954087279456718024314756857391844618124399398708057628320125066326554369882704401306985806960061330024266048787545132315747786708
-```
-
-Length:
-
-```text
-300
-```
-
----
-
-## Hash Verification
-
-Given hash:
-
-```text
-1b6a8e55cba650dc68f6854b35741817daa4851d2d886c9d426dfda3a5fba95e
-```
-
-Computed SHA-256 of the transcribed 300-digit number:
-
-```text
-1b6a8e55cba650dc68f6854b35741817daa4851d2d886c9d426dfda3a5fba95e
-```
-
-The computed hash matched exactly.
-
----
-
-## Final Submission JSON
+The portal requires the answer in this format:
 
 ```json
-{
-  "number": "782176428563539843647502321530753319075407656483147620417267650019183269823095728606650681185717066806781693071483530842126956007856013829124336178703612828669042348697814954087279456718024314756857391844618124399398708057628320125066326554369882704401306985806960061330024266048787545132315747786708",
-  "hash": "1b6a8e55cba650dc68f6854b35741817daa4851d2d886c9d426dfda3a5fba95e"
-}
+{"number":"<300-digit-number>","hash":"<sha256 hash provided by portal>"}
 ```
+
+Important characteristics of this problem:
+
+- The page generates a **new audio sample every time the page reloads**.
+- Each audio corresponds to a **different 300-digit sequence**.
+- The hash displayed on the page equals:
+
+```
+SHA256(number)
+```
+
+Therefore the goal is not to guess the number, but to **correctly reconstruct the digits spoken in the audio**.
 
 ---
 
 ## Key Insight
 
-This question was not meant to be solved by brute force against SHA-256.
+Inspecting the page revealed that the audio is **not fetched from a server**.
 
-The real challenge was to:
+Instead, the entire audio file is embedded directly in the HTML inside an `<audio>` element:
 
-- inspect the page carefully
-- realize the audio was embedded in Base64 form
-- decode it properly
-- use speech recognition
-- validate the transcription with the provided hash
+```html
+<audio controls preload="none" src="data:audio/mpeg;base64,//MYxAA..."></audio>
+```
 
-The verification hash served only to confirm correctness of the transcription.
+This means the audio is encoded as a **Base64 string** inside the page.
+
+Therefore the solution pipeline becomes:
+
+```
+HTML page
+   ↓
+Extract Base64 audio
+   ↓
+Decode Base64 → MP3
+   ↓
+Speech-to-text transcription
+   ↓
+Extract digits
+   ↓
+Verify SHA256 hash
+```
 
 ---
 
-## Result
+## Step 1 — Copy the Page HTML
 
-Successfully extracted the embedded audio, transcribed the spoken digits, verified the SHA-256 hash, and produced the correct 300-digit submission.
+Open the browser developer console and run:
+
+```javascript
+copy(document.documentElement.outerHTML)
+```
+
+This copies the entire page HTML to the clipboard.
+
+Save it locally:
+
+```bash
+nano page.html
+```
+
+Paste the HTML and save the file.
+
+---
+
+## Step 2 — Locate the Embedded Audio
+
+Search for the Base64 audio string:
+
+```bash
+grep "data:audio" page.html
+```
+
+This reveals a long Base64 string beginning with:
+
+```
+data:audio/mpeg;base64,//MYxAA...
+```
+
+Extract the Base64 portion and store it in a file.
+
+Example:
+
+```bash
+nano audio_base64_clean.txt
+```
+
+---
+
+## Step 3 — Decode the Base64 Audio
+
+Convert the Base64 string into an MP3 file.
+
+```bash
+base64 -D -i audio_base64_clean.txt -o digits.mp3
+```
+
+Verify the audio file:
+
+```bash
+file digits.mp3
+```
+
+Expected output:
+
+```
+MPEG ADTS, layer III, 16 kHz, Mono
+```
+
+---
+
+## Step 4 — Transcribe the Audio
+
+Use Whisper speech recognition to transcribe the spoken digits.
+
+```bash
+python -m whisper digits.mp3 --model medium --language en
+```
+
+Whisper generates several files:
+
+```
+digits.txt
+digits.srt
+digits.vtt
+digits.tsv
+```
+
+The `digits.txt` file contains the spoken digits.
+
+Example transcription segment:
+
+```
+7 8 2 1 7 6 4 2 8 5 ...
+```
+
+---
+
+## Step 5 — Extract the 300-Digit Number
+
+Convert the transcript into a continuous number.
+
+```python
+import re
+
+text = open("digits.txt").read()
+digits = "".join(re.findall(r"\d", text))
+
+print(digits)
+print(len(digits))
+```
+
+Output:
+
+```
+300
+```
+
+---
+
+## Step 6 — Verify the SHA-256 Hash
+
+Confirm the number is correct by computing the hash.
+
+```python
+import hashlib
+
+hashlib.sha256(digits.encode()).hexdigest()
+```
+
+Output:
+
+```
+1b6a8e55cba650dc68f6854b35741817daa4851d2d886c9d426dfda3a5fba95e
+```
+
+This matches the hash shown on the page.
+
+---
+
+## Final Answer
+
+300-digit number:
+
+```
+782176428563539843647502321530753319075407656483147620417267650019183269823095728606650681185717066806781693071483530842126956007856013829124336178703612828669042348697814954087279456718024314756857391844618124399398708057628320125066326554369882704401306985806960061330024266048787545132315747786708
+```
+
+Submission JSON:
+
+```json
+{"number":"782176428563539843647502321530753319075407656483147620417267650019183269823095728606650681185717066806781693071483530842126956007856013829124336178703612828669042348697814954087279456718024314756857391844618124399398708057628320125066326554369882704401306985806960061330024266048787545132315747786708","hash":"1b6a8e55cba650dc68f6854b35741817daa4851d2d886c9d426dfda3a5fba95e"}
+```
+
+---
+
+## Automation Insight
+
+Because the page generates a **new audio sample on every refresh**, the exact 300-digit answer is not permanent.
+
+However, the **extraction and transcription pipeline remains identical**.
+
+Reusable workflow:
+
+1. Copy page HTML.
+2. Extract Base64 audio from the `<audio>` tag.
+3. Decode Base64 to MP3.
+4. Run Whisper transcription.
+5. Extract digits.
+6. Verify SHA-256.
+
+This pipeline can reconstruct the number for **any newly generated audio instance** without manually listening to all 300 digits.
+
+---
+
+## Conclusion
+
+The critical insight was recognizing that the audio is embedded directly inside the page as Base64 data.
+
+By extracting, decoding, and transcribing the audio automatically, the 300-digit number can be reconstructed reliably and verified using the provided SHA-256 hash.
+
+This method eliminates manual transcription and creates a repeatable workflow for any regenerated audio sample.
