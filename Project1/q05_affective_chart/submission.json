@@ -1,0 +1,7 @@
+{
+  "prompt": "A conceptual data-art image about the explosive growth of global CO2 emissions since the industrial revolution. Show a giant tree cross-section where the inner rings are thin, pale, and almost clean, but the outer rings become much thicker, darker, and made of factories, smokestacks, pipes, and industrial machinery. The outermost rings should feel dense, polluted, and overwhelming. Thick black smoke rises upward and gradually fills the sky. The tree should feel like a living record of industrial growth turning into environmental damage. Single frame, no panels, no labels, no text, no legend, no axes, no numbers, no infographic layout, no standard chart. Editorial magazine illustration, cinematic, symbolic, emotionally powerful, visually clear even without explanation.",
+  "model": "DALL·E 3 via ChatGPT",
+  "dataset_name": "Our World in Data – CO2 Emissions",
+  "dataset_url": "https://ourworldindata.org/co2-emissions",
+  "insight": "Global CO2 emissions have grown explosively since the industrial revolution."
+}
