@@ -1,158 +1,94 @@
-# TDS Project 1 — Q9: Network Game — Data Labyrinth
+# Project 1 — Q9: Network Game — Data Labyrinth
 
 ## Problem Summary
+Open the weekly Data Labyrinth game, explore the maze, collect all fragments, compute the required statistic, and submit the final answer to obtain the completion JWT. In this run, the question was: “How many records have response_ms greater than the 75th percentile of response_ms? Exclude incomplete records.”
 
-This task involved solving an interactive browser-based maze game where:
+## Approach Overview
+This problem required interacting with the backend API instead of relying on the UI. The workflow was: collect all fragments → fetch inventory using session token → filter out distractors → parse valid data → compute percentile correctly → navigate to submission room (room 120) → submit answer via API → copy completion token.
 
-- The maze is explored through API calls
-- Each move reveals new positions and possible directions
-- Data fragments are collected during traversal
-- A final analytics question must be answered using the collected data
-- The output is a completion JWT token returned by the game
+## Step 1 — Get Session Token
+Use the browser console to retrieve the session token:
+sessionStorage.getItem("tds_token_labyrinth")
 
----
+This token must be included in all API requests as:
+"X-Session-Token": token
 
-## Core Insight
+## Step 2 — Fetch Inventory Data
+Run the following in console:
+(async () => {
+  const token = sessionStorage.getItem("tds_token_labyrinth");
+  const res = await fetch("/labyrinth/inventory", {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Session-Token": token
+    }
+  });
+  const inv = await res.json();
+  console.log(inv);
+})();
 
-This is not a traditional game-solving problem.
+## Step 3 — Extract Valid Records
+Filter out distractors and parse usable rows:
+const rows = (inv.fragments || [])
+  .filter(f => f.type !== "distractor")
+  .map(f => {
+    let d = f.data;
+    if (typeof d === "string") {
+      try { d = JSON.parse(d); } catch {}
+    }
+    return d;
+  })
+  .filter(d => d && d.response_ms != null && !Number.isNaN(Number(d.response_ms)));
 
-The correct approach is to:
-- Reverse engineer the backend API using browser network calls
-- Programmatically explore the maze
-- Collect all fragments
-- Compute the final answer using data analysis
+const values = rows
+  .map(d => Number(d.response_ms))
+  .sort((a, b) => a - b);
 
----
+## Step 4 — Compute 75th Percentile
+Use nearest-rank method (the one accepted by the platform):
+const n = values.length;
+const idx = Math.ceil(0.75 * n) - 1;
+const p75 = values[idx];
+const answer = values.filter(v => v > p75).length;
 
-## Approach
+console.log("FINAL ANSWER =", answer);
 
-### Step 1: Inspect Network Traffic
+## Step 5 — Navigate to Room 120
+Use API movement helper:
+async function mv(direction) {
+  const token = sessionStorage.getItem("tds_token_labyrinth");
+  const res = await fetch("/labyrinth/move", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Session-Token": token
+    },
+    body: JSON.stringify({ direction })
+  });
+  return await res.json();
+}
 
-- Open browser DevTools → Network tab
-- Filter for **Fetch/XHR requests**
-- Perform movements in the maze
-- Observe API calls triggered on each move
+Move only using available exits until:
+room_id = 120
 
-Key observations:
-- Each move sends a request (e.g., `/move`)
-- Responses contain:
-  - Current position
-  - Available directions
-  - Optional data fragments
+## Step 6 — Submit Answer
+(async () => {
+  const token = sessionStorage.getItem("tds_token_labyrinth");
+  const res = await fetch("/labyrinth/submit", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Session-Token": token
+    },
+    body: JSON.stringify({ answer })
+  });
+  const json = await res.json();
+  console.log(json);
+})();
 
----
-
-### Step 2: Understand API Structure
-
-From network inspection:
-
-- Movement is controlled via API calls with direction input
-- The maze behaves deterministically
-- Responses include all necessary state information
-
-This allows full automation of exploration.
-
----
-
-### Step 3: Automate Exploration
-
-A Python script was used to simulate the game:
-
-- Send requests to move in directions
-- Track visited positions
-- Avoid revisiting nodes
-- Explore the entire maze using DFS/BFS
-
----
-
-### Step 4: Maze Traversal Strategy
-
-- Use a set to track visited states
-- Use recursion or queue-based BFS
-- Explore all reachable nodes
-
-Data tracked:
-- Position (coordinates or identifiers)
-- Available moves
-- Fragment data
-
----
-
-### Step 5: Collect Data Fragments
-
-During traversal:
-- Extract fragment data from API responses
-- Store all fragments in a list
-
-Example structure:
-- JSON objects containing attributes required for final analysis
-
----
-
-### Step 6: Perform Data Analysis
-
-After collecting all fragments:
-
-- Convert data into structured format (e.g., Pandas DataFrame)
-- Apply required transformations:
-  - Filtering
-  - Aggregation (sum, average, count, etc.)
-  - Grouping if needed
-
-Solve the final analytics question using this dataset.
-
----
-
-### Step 7: Submit Final Answer
-
-- Send computed result back through the game interface
-- The system returns a **completion JWT token**
-
----
-
-## Output
-
-The final submission consists of:
-
-- A JWT token returned by the system after correct solution
-
-This token:
-- Is signed using the game’s public key
-- Contains:
-  - User identifier
-  - Game identifier
-  - Week identifier
-  - Timestamp
-
----
-
-## Verification Conditions
-
-The submission is validated based on:
-
-1. Valid JWT signature
-2. Matching user email
-3. Correct game identifier (`labyrinth`)
-4. Current ISO week match
-5. Completion timestamp within valid range
-
----
-
-## Key Learnings
-
-- Reverse engineering APIs using browser DevTools
-- Treating UI-based problems as backend data problems
-- Applying graph traversal (DFS/BFS) in real-world scenarios
-- Automating workflows using Python and requests
-- Performing data analysis on dynamically collected datasets
-
----
+## Final Answer
+3
 
 ## Conclusion
-
-This problem required combining:
-- Web debugging skills
-- Algorithmic thinking
-- Data processing
-
-Instead of manually navigating the maze, the optimal solution involved automating the exploration and solving the problem programmatically, demonstrating a practical application of data science and systems thinking.
+The key to solving this problem was avoiding UI-based assumptions and instead interacting directly with the API. Correct filtering of fragments, proper percentile computation (nearest-rank), and ensuring submission from room 120 were critical to obtaining the correct result and completion token.
