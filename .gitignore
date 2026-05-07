@@ -1,6 +1,19 @@
+# Python local state
 __pycache__/
-*.pyc
-.DS_Store
+*.py[cod]
 .venv/
-node_modules/
+venv/
 .env
+.env.*
+!.env.example
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+
+# Node/browser scratch
+node_modules/
+
+# Generated scratch artifacts
+*.tmp
+.cache/
